@@ -111,13 +111,20 @@ func (d *ModDisplay) ShowCharacter(c byte) {
 }
 
 func (d *ModDisplay) Scroll(img image5x5.Image) {
-
+	d.anim.animType = animTypeScroll
+	d.anim.elapse = 0
+	d.anim.interval = 1000
+	d.anim.count = display_width
+	d.scroll.value = nil
+	d.scroll.cur = 0
+	d.Show(img)
 }
 
 func (d *ModDisplay) ScrollText(text string) {
+	d.anim.animType = animTypeScroll
 	d.anim.elapse = 0
 	d.anim.interval = 1000
-	d.anim.count = 5
+	d.anim.count = display_width - 1
 	d.scroll.value = []byte(text)
 	d.scroll.cur = 0
 	d.ShowCharacter(d.scroll.value[0])
@@ -137,17 +144,15 @@ LOOP:
 		default:
 		}
 
-		d.update()
+		now := time.Now()
+		diff := int32(now.Sub(d.lastTime).Milliseconds())
+		d.animUpdate(diff)
+		d.lastTime = now
+
 		d.render()
 	}
 	d.Clear()
 	d.quitWg.Done()
-}
-
-func (d *ModDisplay) update() {
-	diff := int32(time.Now().Sub(d.lastTime).Milliseconds())
-	d.animUpdate(diff)
-
 }
 
 func (d *ModDisplay) animUpdate(diff int32) {
@@ -158,6 +163,7 @@ func (d *ModDisplay) animUpdate(diff int32) {
 	if d.anim.elapse < d.anim.interval {
 		return
 	}
+	d.anim.elapse = 0
 	d.anim.count--
 	if d.anim.count == 0 {
 		d.animEnd()
@@ -169,11 +175,20 @@ func (d *ModDisplay) animUpdate(diff int32) {
 }
 
 func (d *ModDisplay) scrollUpdate() {
-
+	copy(d.buffer[:], d.buffer[1:])
+	for i := 1; i < display_height; i++ {
+		d.buffer[i*display_width-1] = 0
+	}
 }
 
 func (d *ModDisplay) animEnd() {
-
+	if d.anim.animType == animTypeScroll && d.scroll.value != nil {
+		d.scroll.cur++
+		if d.scroll.cur < len(d.scroll.value) {
+			d.anim.count = display_width - 1
+			d.ShowCharacter(d.scroll.value[d.scroll.cur])
+		}
+	}
 }
 
 func (d *ModDisplay) render() {

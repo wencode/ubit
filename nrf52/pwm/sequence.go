@@ -9,15 +9,20 @@ import (
 	"github.com/wencode/ubit/common"
 )
 
+// Sequence defining a sequence of PWM duty cycles
+// see: nrf-sdk/include/nrf_pwm.h
+// When the sequence is set, the provided duty cycle values are not copied.
+// The valuses pointer is stored in the internal register of the peripheral,
+// and the values are loaded from RAM during the sequence playback.
 type Sequence struct {
-	raw       []uint16
+	values    []uint16
 	repeated  uint32
 	end_delay uint32
 }
 
 func NewSequence(values []uint16) *Sequence {
 	return &Sequence{
-		raw: values,
+		values: values,
 	}
 }
 
@@ -32,10 +37,10 @@ func NewSequenceWithMulitChannel(values ...[]uint16) (*Sequence, error) {
 		}
 	}
 	seq := &Sequence{
-		raw: make([]uint16, 0, len(values[0])*values_num),
+		values: make([]uint16, 0, len(values[0])*values_num),
 	}
 	for i := 0; i < values_num; i++ {
-		seq.raw = append(seq.raw, values[i]...)
+		seq.values = append(seq.values, values[i]...)
 	}
 	return seq, nil
 }
@@ -44,10 +49,10 @@ func (seq *Sequence) SetRepeated(n int) { seq.repeated = uint32(n) }
 
 func (seq *Sequence) SetEndDelay(v int) { seq.end_delay = uint32(v) }
 
-func (seq *Sequence) fillto(p *nrf.PWM_Type, seq_id int) {
-	raw_header := (*reflect.SliceHeader)(unsafe.Pointer(&seq.raw))
-	p.SEQ[seq_id].PTR.Set(uint32(raw_header.Data))
-	p.SEQ[seq_id].CNT.Set(uint32(raw_header.Len))
+func (seq *Sequence) setTo(p *nrf.PWM_Type, seq_id int) {
+	values_header := (*reflect.SliceHeader)(unsafe.Pointer(&seq.values))
+	p.SEQ[seq_id].PTR.Set(uint32(values_header.Data))
+	p.SEQ[seq_id].CNT.Set(uint32(values_header.Len))
 	p.SEQ[seq_id].REFRESH.Set(seq.repeated)
 	p.SEQ[seq_id].ENDDELAY.Set(seq.end_delay)
 }

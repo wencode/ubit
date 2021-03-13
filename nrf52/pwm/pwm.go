@@ -231,8 +231,8 @@ func (p *PWM) Uninit() {
 }
 
 func (p *PWM) SimplePlayback(seq *Sequence, playback_count uint16) {
-	seq.fillto(p.PWM_Type, 0)
-	seq.fillto(p.PWM_Type, 1)
+	seq.setTo(p.PWM_Type, 0)
+	seq.setTo(p.PWM_Type, 1)
 	p.seq0 = seq
 	p.seq1 = seq
 	odd := (playback_count&1 == 1)
@@ -258,8 +258,8 @@ func (p *PWM) SimplePlayback(seq *Sequence, playback_count uint16) {
 }
 
 func (p *PWM) Playback(seq0, seq1 *Sequence, playback_count uint16) {
-	seq0.fillto(p.PWM_Type, 0)
-	seq1.fillto(p.PWM_Type, 1)
+	seq0.setTo(p.PWM_Type, 0)
+	seq1.setTo(p.PWM_Type, 1)
 	p.seq0 = seq0
 	p.seq1 = seq1
 	p.LOOP.Set(uint32(playback_count))
@@ -306,23 +306,29 @@ func (p *PWM) IsStopped() bool {
 	return true
 }
 
+var TestEvent Event
+
 func (p *PWM) irqHandler(ir interrupt.Interrupt) {
 	if e := common.Volatile32_GetAndClear(&p.EVENTS_SEQEND[0]); e != 0 {
+		TestEvent = EventSeqEnd0
 		if p.handler != nil {
 			p.handler(EventSeqEnd0, p.context)
 		}
 	}
 	if e := common.Volatile32_GetAndClear(&p.EVENTS_SEQEND[1]); e != 0 {
+		TestEvent = EventSeqEnd1
 		if p.handler != nil {
 			p.handler(EventSeqEnd1, p.context)
 		}
 	}
 	if e := common.Volatile32_GetAndClear(&p.EVENTS_LOOPSDONE); e != 0 {
+		TestEvent = EventLoopsDone
 		if p.handler != nil {
 			p.handler(EventLoopsDone, p.context)
 		}
 	}
 	if e := common.Volatile32_GetAndClear(&p.EVENTS_STOPPED); e != 0 {
+		TestEvent = EventStopped
 		p.state.Set(nrf52.DriverInitialized)
 		if p.handler != nil {
 			p.handler(EventStopped, p.context)

@@ -6,22 +6,34 @@ import (
 
 	"machine"
 
+	"github.com/wencode/ubit"
 	"github.com/wencode/ubit/nrf52/pwm"
 )
 
 func main() {
-	machine.LED_ROW_5.Configure(machine.PinConfig{machine.PinOutput})
-	machine.LED_COL_4.Configure(machine.PinConfig{machine.PinOutput})
-	machine.LED_COL_5.Configure(machine.PinConfig{machine.PinOutput})
-
-	machine.LED_ROW_5.High()
-	machine.LED_COL_4.Low()
-	time.Sleep(time.Millisecond * 2)
+	ubit.Display.Init()
+	ubit.Display.ShowCharacter('S')
 
 	p, err := pwm.Init(pwm.ID0,
 		pwm.WithHandler(
 			func(event pwm.Event, context interface{}) {
 				fmt.Printf("event %d\n", event)
+				switch event {
+				case pwm.EventStopped:
+					ubit.Display.ShowCharacter('T')
+				case pwm.EventSeqStarted0:
+					ubit.Display.ShowCharacter('0')
+				case pwm.EventSeqStarted1:
+					ubit.Display.ShowCharacter('1')
+				case pwm.EventSeqEnd0:
+					ubit.Display.ShowCharacter('E')
+				case pwm.EventSeqEnd1:
+					ubit.Display.ShowCharacter('F')
+				case pwm.EventPWMPeriodEnd:
+					ubit.Display.ShowCharacter('P')
+				case pwm.EventLoopsDone:
+					ubit.Display.ShowCharacter('L')
+				}
 			}, nil),
 		pwm.WithOutputPin(machine.SPEAKER_PIN),
 	)
@@ -29,8 +41,6 @@ func main() {
 		fmt.Printf("pwm init error: %v\n", err)
 		return
 	}
-	machine.LED_COL_5.Low()
-	time.Sleep(time.Millisecond * 2)
 
 	seq := pwm.NewSequence(airtel[:])
 
@@ -40,5 +50,26 @@ func main() {
 		time.Sleep(time.Millisecond * 1)
 	}
 
+	time.Sleep(time.Second * 1)
+
+	switch pwm.TestEvent {
+	case pwm.EventStopped:
+		ubit.Display.ShowCharacter('9')
+	case pwm.EventSeqStarted0:
+		ubit.Display.ShowCharacter('8')
+	case pwm.EventSeqStarted1:
+		ubit.Display.ShowCharacter('7')
+	case pwm.EventSeqEnd0:
+		ubit.Display.ShowCharacter('6')
+	case pwm.EventSeqEnd1:
+		ubit.Display.ShowCharacter('5')
+	case pwm.EventPWMPeriodEnd:
+		ubit.Display.ShowCharacter('4')
+	case pwm.EventLoopsDone:
+		ubit.Display.ShowCharacter('3')
+	}
+	time.Sleep(time.Second * 1)
+
 	p.Uninit()
+	ubit.Display.Uninit()
 }

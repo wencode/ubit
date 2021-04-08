@@ -15,8 +15,12 @@ import (
 // The valuses pointer is stored in the internal register of the peripheral,
 // and the values are loaded from RAM during the sequence playback.
 type Sequence struct {
-	values    []uint16
-	repeated  uint32
+	values []uint16
+	// Number of times that each duty cycle is is to be repeated
+	// (after being played once).
+	repeated uint32
+	// Additional time (in PWM periods) that the last duty cycle
+	// is to be kept after the sequence is played.
 	end_delay uint32
 }
 

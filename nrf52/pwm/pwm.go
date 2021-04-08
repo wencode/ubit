@@ -55,6 +55,8 @@ const (
 	CLK_500KHz = nrf.PWM_PRESCALER_PRESCALER_DIV_32
 	CLK_250KHz = nrf.PWM_PRESCALER_PRESCALER_DIV_64
 	CLK_125KHz = nrf.PWM_PRESCALER_PRESCALER_DIV_128
+
+	clock_frequency = 16000000
 )
 
 var (
@@ -114,8 +116,8 @@ func pwm_defaultConfig() Config {
 			machine.NoPin,
 			machine.NoPin,
 		},
-		irq_priority:  7,
-		base_clock:    CLK_1MHz,
+		irq_priority:  6,
+		base_clock:    CLK_8MHz,
 		count_mode:    nrf.PWM_MODE_UPDOWN_Up,
 		top_value:     255,
 		dec_load:      nrf.PWM_DECODER_LOAD_Common,
@@ -157,6 +159,12 @@ func WithBaseCLK(clk uint32) Option {
 	}
 }
 
+func WithTopValue(top_value uint16) Option {
+	return func(cfg *Config) {
+		cfg.top_value = top_value
+	}
+}
+
 func Init(id ID, opts ...Option) (*PWM, error) {
 	pwm := &(_pwms[id])
 	if pwm.id != -1 {
@@ -173,9 +181,9 @@ func Init(id ID, opts ...Option) (*PWM, error) {
 	pwm_configurePins(pwm.PWM_Type, &cfg)
 
 	pwm.ENABLE.Set(nrf.PWM_ENABLE_ENABLE_Enabled << nrf.PWM_ENABLE_ENABLE_Pos)
-	pwm.PRESCALER.Set(cfg.base_clock)
-	pwm.MODE.Set(cfg.count_mode)
-	pwm.COUNTERTOP.Set(uint32(cfg.top_value))
+	pwm.PRESCALER.Set(cfg.base_clock << nrf.PWM_PRESCALER_PRESCALER_Pos)
+	pwm.MODE.Set(cfg.count_mode << nrf.PWM_MODE_UPDOWN_Pos)
+	pwm.COUNTERTOP.Set(uint32(cfg.top_value) << nrf.PWM_COUNTERTOP_COUNTERTOP_Pos)
 
 	pwm.DECODER.Set((cfg.dec_load << nrf.PWM_DECODER_LOAD_Pos) |
 		(cfg.dec_mode << nrf.PWM_DECODER_MODE_Pos))
@@ -209,6 +217,7 @@ func Init(id ID, opts ...Option) (*PWM, error) {
 		}
 		ir.SetPriority(cfg.irq_priority)
 		ir.Enable()
+		println("open irq ", id, " ", cfg.irq_priority)
 
 		pwm.ir = ir
 	}
@@ -236,6 +245,10 @@ func (p *PWM) SimplePlayback(seq *Sequence, playback_count uint16) {
 	p.seq0 = seq
 	p.seq1 = seq
 	odd := (playback_count&1 == 1)
+	playback_count /= 2
+	if odd {
+		playback_count += 1
+	}
 	p.LOOP.Set(uint32(playback_count))
 
 	shorts_mask := uint32(0)
@@ -306,29 +319,23 @@ func (p *PWM) IsStopped() bool {
 	return true
 }
 
-var TestEvent Event
-
 func (p *PWM) irqHandler(ir interrupt.Interrupt) {
 	if e := common.Volatile32_GetAndClear(&p.EVENTS_SEQEND[0]); e != 0 {
-		TestEvent = EventSeqEnd0
 		if p.handler != nil {
 			p.handler(EventSeqEnd0, p.context)
 		}
 	}
 	if e := common.Volatile32_GetAndClear(&p.EVENTS_SEQEND[1]); e != 0 {
-		TestEvent = EventSeqEnd1
 		if p.handler != nil {
 			p.handler(EventSeqEnd1, p.context)
 		}
 	}
 	if e := common.Volatile32_GetAndClear(&p.EVENTS_LOOPSDONE); e != 0 {
-		TestEvent = EventLoopsDone
 		if p.handler != nil {
 			p.handler(EventLoopsDone, p.context)
 		}
 	}
 	if e := common.Volatile32_GetAndClear(&p.EVENTS_STOPPED); e != 0 {
-		TestEvent = EventStopped
 		p.state.Set(nrf52.DriverInitialized)
 		if p.handler != nil {
 			p.handler(EventStopped, p.context)
@@ -338,6 +345,15 @@ func (p *PWM) irqHandler(ir interrupt.Interrupt) {
 
 func (p *PWM) startPlayback(starting_task Task) {
 	p.state.Set(nrf52.DriverStatePoweredOn)
+
+	if p.handler != nil {
+		int_mask := uint32(nrf.PWM_INTEN_LOOPSDONE_Msk |
+				nrf.PWM_INTEN_STOPPED_Msk |
+				nrf.PWM_INTEN_SEQEND0_Msk |
+				nrf.PWM_INTEN_SEQEND1_Msk)
+		p.INTEN.Set(int_mask)
+	}
+
 	p.EVENTS_STOPPED.Set(0)
 	pwm_taskTrigger(p.PWM_Type, starting_task)
 }

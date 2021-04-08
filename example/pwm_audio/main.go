@@ -10,6 +10,15 @@ import (
 	"github.com/wencode/ubit/nrf52/pwm"
 )
 
+var (
+	testEvent2 pwm.Event
+)
+
+var (
+	//ch0_duty = []uint16{16000}//,8000,4000,2000}
+	ch0_duty = []uint16{127,127,127,127}
+)
+
 func main() {
 	ubit.Display.Init()
 	ubit.Display.ShowCharacter('S')
@@ -17,24 +26,11 @@ func main() {
 	p, err := pwm.Init(pwm.ID0,
 		pwm.WithHandler(
 			func(event pwm.Event, context interface{}) {
-				fmt.Printf("event %d\n", event)
-				switch event {
-				case pwm.EventStopped:
-					ubit.Display.ShowCharacter('T')
-				case pwm.EventSeqStarted0:
-					ubit.Display.ShowCharacter('0')
-				case pwm.EventSeqStarted1:
-					ubit.Display.ShowCharacter('1')
-				case pwm.EventSeqEnd0:
-					ubit.Display.ShowCharacter('E')
-				case pwm.EventSeqEnd1:
-					ubit.Display.ShowCharacter('F')
-				case pwm.EventPWMPeriodEnd:
-					ubit.Display.ShowCharacter('P')
-				case pwm.EventLoopsDone:
-					ubit.Display.ShowCharacter('L')
-				}
+				fmt.Printf("in handler %x\n", event)
+				testEvent2 = event
 			}, nil),
+		pwm.WithBaseCLK(pwm.CLK_125KHz),
+		pwm.WithTopValue(255),
 		pwm.WithOutputPin(machine.SPEAKER_PIN),
 	)
 	if err != nil {
@@ -42,32 +38,15 @@ func main() {
 		return
 	}
 
-	seq := pwm.NewSequence(airtel[:])
+	seq := pwm.NewSequence(ch0_duty[:])
 
-	p.SimplePlayback(seq, 1)
+	p.SimplePlayback(seq, 2)
 
 	for !p.IsStopped() {
 		time.Sleep(time.Millisecond * 1)
 	}
+	println("stopped")
 
-	time.Sleep(time.Second * 1)
-
-	switch pwm.TestEvent {
-	case pwm.EventStopped:
-		ubit.Display.ShowCharacter('9')
-	case pwm.EventSeqStarted0:
-		ubit.Display.ShowCharacter('8')
-	case pwm.EventSeqStarted1:
-		ubit.Display.ShowCharacter('7')
-	case pwm.EventSeqEnd0:
-		ubit.Display.ShowCharacter('6')
-	case pwm.EventSeqEnd1:
-		ubit.Display.ShowCharacter('5')
-	case pwm.EventPWMPeriodEnd:
-		ubit.Display.ShowCharacter('4')
-	case pwm.EventLoopsDone:
-		ubit.Display.ShowCharacter('3')
-	}
 	time.Sleep(time.Second * 1)
 
 	p.Uninit()

@@ -7,7 +7,7 @@ import (
 	"runtime/volatile"
 
 	"github.com/wencode/ubit/common"
-	"github.com/wencode/ubit/nrf52"
+	cnrf "github.com/wencode/ubit/nrf"
 )
 
 const (
@@ -222,7 +222,7 @@ func Init(id ID, opts ...Option) (*PWM, error) {
 		pwm.ir = ir
 	}
 
-	pwm.state.Set(nrf52.DriverInitialized)
+	pwm.state.Set(cnrf.DriverInitialized)
 	pwm.id = int32(id)
 	return pwm, nil
 }
@@ -236,7 +236,7 @@ func (p *PWM) Uninit() {
 	p.ENABLE.Set(nrf.PWM_ENABLE_ENABLE_Disabled << nrf.PWM_ENABLE_ENABLE_Pos)
 	pwm_deconfigurePins(p.PWM_Type)
 
-	p.state.Set(nrf52.DriverUninitialized)
+	p.state.Set(cnrf.DriverUninitialized)
 }
 
 func (p *PWM) SimplePlayback(seq *Sequence, playback_count uint16) {
@@ -309,13 +309,13 @@ func (p *PWM) Stop(wait_until_stopped bool) bool {
 }
 
 func (p *PWM) IsStopped() bool {
-	if p.state.Get() != nrf52.DriverStatePoweredOn {
+	if p.state.Get() != cnrf.DriverStatePoweredOn {
 		return true
 	}
 	if p.EVENTS_STOPPED.Get() == 0 {
 		return false
 	}
-	p.state.Set(nrf52.DriverInitialized)
+	p.state.Set(cnrf.DriverInitialized)
 	return true
 }
 
@@ -336,7 +336,7 @@ func (p *PWM) irqHandler(ir interrupt.Interrupt) {
 		}
 	}
 	if e := common.Volatile32_GetAndClear(&p.EVENTS_STOPPED); e != 0 {
-		p.state.Set(nrf52.DriverInitialized)
+		p.state.Set(cnrf.DriverInitialized)
 		if p.handler != nil {
 			p.handler(EventStopped, p.context)
 		}
@@ -344,13 +344,13 @@ func (p *PWM) irqHandler(ir interrupt.Interrupt) {
 }
 
 func (p *PWM) startPlayback(starting_task Task) {
-	p.state.Set(nrf52.DriverStatePoweredOn)
+	p.state.Set(cnrf.DriverStatePoweredOn)
 
 	if p.handler != nil {
 		int_mask := uint32(nrf.PWM_INTEN_LOOPSDONE_Msk |
-				nrf.PWM_INTEN_STOPPED_Msk |
-				nrf.PWM_INTEN_SEQEND0_Msk |
-				nrf.PWM_INTEN_SEQEND1_Msk)
+			nrf.PWM_INTEN_STOPPED_Msk |
+			nrf.PWM_INTEN_SEQEND0_Msk |
+			nrf.PWM_INTEN_SEQEND1_Msk)
 		p.INTEN.Set(int_mask)
 	}
 
@@ -366,7 +366,7 @@ func pwm_configurePins(p *nrf.PWM_Type, cfg *Config) {
 
 			if !cfg.skip_gpio_cfg {
 				inverted := (output_pin&PIN_INVERTED != 0)
-				port, pin_number := nrf52.GetPortPin(machine.Pin(pin))
+				port, pin_number := cnrf.GetPortPin(machine.Pin(pin))
 				if inverted {
 					port.OUTSET.Set(uint32(1) << pin_number)
 				} else {
@@ -384,7 +384,7 @@ func pwm_deconfigurePins(p *nrf.PWM_Type) {
 	for i := 0; i < CHANNEL_COUNT; i++ {
 		output_in := p.PSEL.OUT[i].Get()
 		if output_in != PIN_NOT_CONNECTED {
-			nrf52.GPIO_Cfg_Default(output_in)
+			cnrf.GPIO_Cfg_Default(output_in)
 		}
 	}
 }

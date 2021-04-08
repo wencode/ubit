@@ -1,4 +1,4 @@
-package nrf52
+package nrf
 
 import (
 	"unsafe"

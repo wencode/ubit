@@ -7,7 +7,7 @@ import (
 	"machine"
 
 	"github.com/wencode/ubit"
-	"github.com/wencode/ubit/nrf52/pwm"
+	"github.com/wencode/ubit/nrf/pwm"
 )
 
 var (
@@ -16,7 +16,7 @@ var (
 
 var (
 	//ch0_duty = []uint16{16000}//,8000,4000,2000}
-	ch0_duty = []uint16{127,127,127,127}
+	ch0_duty = []uint16{127, 127, 127, 127}
 )
 
 func main() {
